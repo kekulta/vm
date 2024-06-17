@@ -5,6 +5,6 @@
 #include "class.h"
 #include "jvm.h"
 
-class_struct_t  *resolve_class(vm_context_t *context, char *class_name);
+class_t *resolve_class(vm_context_t *context, char *class_name);
 
 #endif

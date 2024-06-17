@@ -1,22 +1,21 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-typedef struct instance_struct instance_struct_t;
-typedef struct array_struct    array_struct_t;
+#include "types.h"
 
-typedef enum {
-    OBJ_INSTANCE,
-    OBJ_ARRAY,
-} object_type_t;
+typedef struct aarray_struct   aarray_t;
+typedef struct iarray_struct   iarray_t;
+typedef struct instance_struct instance_t;
 
 typedef union object_value {
-    instance_struct_t *instance;
-    array_struct_t    *array;
+    instance_t *instance;
+    aarray_t   *aarray;
+    iarray_t   *iarray;
 } object_value_t;
 
 typedef struct object_struct {
-    object_type_t  type;
+    descriptor_t   descriptor;
     object_value_t value;
-} object_struct_t;
+} object_t;
 
 #endif

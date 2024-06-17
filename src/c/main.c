@@ -13,13 +13,13 @@
 static char DEFAULT_BOOTPATH[] = "std";
 static char DEFAULT_CLASSPATH[] = ".";
 
-vm_frame_t *
-create_entry_frame(vm_context_t *context, class_struct_t *class_struct)
+frame_t *
+create_entry_frame(vm_context_t *context, class_t *class_struct)
 {
     flags_t main_flags, method_flags;
     char   *main_name, *main_descriptor, *method_name, *method_descriptor;
     method_info_t    *method;
-    vm_frame_t       *main_frame;
+    frame_t          *main_frame;
     attribute_code_t *code;
 
     main_name = "main";
@@ -30,15 +30,18 @@ create_entry_frame(vm_context_t *context, class_struct_t *class_struct)
 
     if (method == NULL
         || !check_flags(method->access_flags, main_flags, NO_FLAGS)) {
+        fprintf(stderr, "Can't find main method.");
         return NULL;
     }
 
     vm_value_t *args = malloc(sizeof(vm_value_t) * 1);
     size_t      sizes[] = {2, 3, 4};
 
-    args[0].type = J_REFERENCE;
-    args[0].value.object_struct = allocate_array_a(
-        context, resolve_class(context, "java/lang/String"), 1, sizes);
+    args[0].descriptor = "[Ljava/lang/String;";
+    printf("args[0]: %s\n", args[0].descriptor);
+    args[0].content.object = allocate_array_a(context, "[Ljava/lang/String;", 1,
+                                              sizes);
+
 
     main_frame = construct_frame(context, class_struct, method, args);
 
@@ -48,11 +51,11 @@ create_entry_frame(vm_context_t *context, class_struct_t *class_struct)
 int
 main(int argc, char **argv)
 {
-    char           *class_name, *std_lib;
-    class_struct_t *entry_point;
-    uint32_t        magic;
-    vm_frame_t     *frame;
-    vm_context_t   *context;
+    char         *class_name, *std_lib;
+    class_t      *entry_point;
+    uint32_t      magic;
+    frame_t      *frame;
+    vm_context_t *context;
 
     context = calloc(1, sizeof(vm_context_t));
     context->class_table = calloc(1, sizeof(class_table_t));

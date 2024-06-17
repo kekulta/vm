@@ -3,10 +3,11 @@
 #include "class.h"
 #include "class_printer.h"
 #include "instance.h"
+#include "jvm.h"
 #include "object.h"
 
 void
-print_attribute(class_struct_t *class_struct, attribute_info_t *attribute_info,
+print_attribute(class_t *class_struct, attribute_info_t *attribute_info,
                 char *prefix)
 {
     attribute_type_t attribute_type = attribute_info->tag;
@@ -16,7 +17,7 @@ print_attribute(class_struct_t *class_struct, attribute_info_t *attribute_info,
 }
 
 void
-print_class(class_struct_t *class_struct)
+print_class(class_t *class_struct)
 {
     printf("CLASS_STRUCT:\n"
            "\tminor: %d\n"
@@ -125,52 +126,51 @@ print_class(class_struct_t *class_struct)
 }
 
 void
-print_object(object_struct_t *object_struct)
+print_object(object_t *object_struct)
 {
-    field_struct_t     field;
-    instance_struct_t *instance;
-    array_struct_t    *array;
+    field_t     field;
+    instance_t *instance;
+    bool        is_aarray;
+    size_t      array_size;
 
     printf("%p:\n", object_struct);
-    if (object_struct->type == OBJ_INSTANCE) {
+    if (object_struct->descriptor[0] != '[') {
         instance = object_struct->value.instance;
         printf("class_name: %s\n", instance->class_name);
         printf("fields_count: %zu\n", instance->fields_count);
         for (size_t i = 0; i < instance->fields_count; i++) {
             field = instance->fields[i];
-            printf("\t%s %s %s\n", field.class_name, field.descriptor,
+            printf("\t%s %s %s\n", field.field_name, field.descriptor,
                    field.field_name);
-            switch (field.type) {
-                case J_INT: printf("\t\tINT: %d\n", field.value.jint); break;
-                case J_REFERENCE:
-                    printf("\t\tREFERENCE: %p\n", field.value.object_struct);
+            switch (field.descriptor[0]) {
+                case 'I': printf("\t\tINT: %d\n", field.value.jint); break;
+                case 'L':
+                case '[':
+                    printf("\t\tREFERENCE: %p\n", field.value.object);
                     break;
                 default: printf("\t\tUNKNOWN");
             }
         }
-    } else if (object_struct->type == OBJ_ARRAY) {
-        array = object_struct->value.array;
-        printf("ARR:\n\tsize: %zu\n\tdimensions: %zu\n", array->size,
-               array->dimensions);
-        if (array->type == ARRAY_I && array->dimensions == 1) {
-            printf("\ttype: I\n");
-            printf("\tvalues: {");
-            for (size_t i = 0; i < array->size; i++) {
-                printf("%d", array->value[i].jint);
+    } else {
+        printf("ARR:\n");
+        printf("\ttype: %s\n", object_struct->descriptor);
+        printf("\tvalues: {");
+        is_aarray = object_struct->descriptor[1] != 'I';
 
-                if (i < array->size - 1) {
-                    printf(", ");
-                }
+        if (is_aarray) {
+            array_size = object_struct->value.aarray->size;
+        } else {
+            array_size = object_struct->value.iarray->size;
+        }
+
+        for (size_t i = 0; i < array_size; i++) {
+            if (is_aarray) {
+                printf("%p", object_struct->value.aarray->value[i]);
+            } else {
+                printf("%d", object_struct->value.iarray->value[i]);
             }
-        } else if (array->type == ARRAY_A || array->dimensions != 1) {
-            printf("\ttype: %s\n", array->class_name);
-            printf("\tvalues: {");
-            for (size_t i = 0; i < array->size; i++) {
-                printf("%p", array->value[i].object);
-
-                if (i < array->size - 1) {
-                    printf(", ");
-                }
+            if (i < array_size) {
+                printf(", ");
             }
         }
         printf("}\n");
@@ -202,20 +202,21 @@ print_class_table(class_table_t *class_table)
 void
 print_value(vm_value_t value)
 {
-    switch (value.type) {
-        case J_INT: printf("INT: %d\n", value.value.jint); break;
-        case J_REFERENCE:
-            if (value.value.object_struct == NULL) {
-                printf("OBJECT: %p\n", value.value.object_struct);
+    switch (value.descriptor[0]) {
+        case 'I': printf("INT: %d\n", value.content.jint); break;
+        case 'L':
+        case '[':
+            if (value.content.object == NULL) {
+                printf("OBJECT: %p\n", value.content.object);
             } else {
-                print_object(value.value.object_struct);
+                print_object(value.content.object);
             }
             break;
     }
 }
 
 void
-print_frame(vm_context_t *context, vm_frame_t *frame)
+print_frame(vm_context_t *context, frame_t *frame)
 {
     printf("FRAME:\n");
     printf("descriptor: %s\n", frame->descriptor);

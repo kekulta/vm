@@ -3,26 +3,17 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "types.h"
 
-typedef struct object_struct object_struct_t;
+typedef struct object_struct object_t;
 
-typedef enum {
-    ARRAY_I,
-    ARRAY_A,
-} array_type_t;
+typedef struct aarray_struct {
+    size_t     size;
+    object_t **value;
+} aarray_t;
 
-typedef union array_value {
-    object_struct_t *object;
-    int32_t          jint;
-} array_value_t;
-
-typedef struct array_struct {
-    array_type_t   type;
-    /* NULL if type is not ARRAY_A */
-    char          *class_name;
-    size_t         dimensions;
-    size_t         size;
-    array_value_t *value;
-} array_struct_t;
-
+typedef struct iarray_struct {
+    size_t  size;
+    jint_t *value;
+} iarray_t;
 #endif

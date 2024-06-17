@@ -5,7 +5,7 @@
 #include "jvm.h"
 
 char *
-get_class_name(class_struct_t *class_struct, size_t position)
+get_class_name(class_t *class_struct, size_t position)
 {
     class_info_t *class_info;
 
@@ -18,7 +18,7 @@ get_class_name(class_struct_t *class_struct, size_t position)
 }
 
 char *
-get_string(class_struct_t *class_struct, size_t position)
+get_string(class_t *class_struct, size_t position)
 {
     return get_utf8(
         class_struct,
@@ -27,7 +27,7 @@ get_string(class_struct_t *class_struct, size_t position)
 }
 
 char *
-get_method_name(class_struct_t *class_struct, size_t position)
+get_method_name(class_t *class_struct, size_t position)
 {
 
     return get_utf8(
@@ -42,7 +42,7 @@ get_method_name(class_struct_t *class_struct, size_t position)
 }
 
 char *
-get_method_descriptor(class_struct_t *class_struct, size_t position)
+get_method_descriptor(class_t *class_struct, size_t position)
 {
 
     return get_utf8(
@@ -57,7 +57,7 @@ get_method_descriptor(class_struct_t *class_struct, size_t position)
 }
 
 char *
-get_method_class(class_struct_t *class_struct, size_t position)
+get_method_class(class_t *class_struct, size_t position)
 {
     return get_class_name(
         class_struct,
@@ -80,7 +80,7 @@ attribute_name_lookup(attribute_type_t attribute_type)
 }
 
 char *
-get_utf8(class_struct_t *class_struct, uint32_t position)
+get_utf8(class_t *class_struct, uint32_t position)
 {
     utf8_info_t *utf_info;
 
@@ -90,7 +90,7 @@ get_utf8(class_struct_t *class_struct, uint32_t position)
 }
 
 method_info_t *
-find_method_special(class_struct_t *class_struct, char *method_name,
+find_method_special(class_t *class_struct, char *method_name,
                     char *method_descriptor)
 {
     method_info_t *methods, *method;
@@ -110,7 +110,7 @@ find_method_special(class_struct_t *class_struct, char *method_name,
 }
 
 method_info_t *
-find_method_virtual(class_struct_t *class_struct, char *method_name,
+find_method_virtual(class_t *class_struct, char *method_name,
                     char *method_descriptor)
 {
     method_info_t *method;
@@ -142,15 +142,22 @@ find_code(method_info_t *method)
 }
 
 bool
-is_subclass(vm_context_t *context, class_struct_t *super_class,
-            char *subclass_name)
+is_subclass(vm_context_t *context, char *super_class_name, char *subclass_name)
 {
+    class_t *subclass;
+
+    subclass = resolve_class(context, subclass_name);
+
+    if (subclass == NULL) {
+        return false;
+    }
+
     while (1) {
-        if (super_class->this_class == subclass_name) {
+        if (subclass->this_class == super_class_name) {
             return true;
         } else {
-            if (super_class->super_class != NULL) {
-                super_class = resolve_class(context, super_class->super_class);
+            if (subclass->super_class != NULL) {
+                subclass = resolve_class(context, subclass->super_class);
             } else {
                 return false;
             }
@@ -159,8 +166,8 @@ is_subclass(vm_context_t *context, class_struct_t *super_class,
 }
 
 size_t
-count_fields(vm_context_t *context, class_struct_t *class_struct,
-             flags_t t_acc_flags, flags_t f_acc_flags)
+count_fields(vm_context_t *context, class_t *class_struct, flags_t t_acc_flags,
+             flags_t f_acc_flags)
 {
     size_t count;
 

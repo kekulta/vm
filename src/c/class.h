@@ -9,11 +9,12 @@
 #define MAGIC    0xCAFEBABE
 #define NO_FLAGS 0
 
-typedef struct vm_context vm_context_t;
+typedef struct vm_context    vm_context_t;
+typedef struct object_struct object_t;
 
-typedef uint8_t           u1_t;
-typedef uint16_t          u2_t;
-typedef uint32_t          u4_t;
+typedef uint8_t              u1_t;
+typedef uint16_t             u2_t;
+typedef uint32_t             u4_t;
 
 typedef enum {
     CONSTANT_CLASS = 7,
@@ -140,7 +141,7 @@ typedef struct attribute_code {
 typedef struct method_info {
     flags_t           access_flags;
     char             *name;
-    char             *descriptor;
+    descriptor_t      descriptor;
     size_t            attributes_count;
     attribute_info_t *attributes;
 } method_info_t;
@@ -160,6 +161,7 @@ typedef struct class_struct {
     cp_info_t        *constant_pool;
     flags_t           access_flags;
     char             *this_class;
+    descriptor_t      descriptor;
     char             *super_class;
     size_t            interfaces_count;
     char            **interfaces;
@@ -169,35 +171,35 @@ typedef struct class_struct {
     method_info_t    *methods;
     size_t            attributes_count;
     attribute_info_t *attributes;
-    object_struct_t  *static_instance;
-} class_struct_t;
+    object_t         *static_instance;
+} class_t;
 
-method_info_t *find_method_special(class_struct_t *class_struct,
-                                   char *method_name, char *method_descriptor);
+method_info_t    *find_method_special(class_t *class_struct, char *method_name,
+                                      char *method_descriptor);
 
-method_info_t *find_method_virtual(class_struct_t *class_struct,
-                                   char *method_name, char *method_descriptor);
+method_info_t    *find_method_virtual(class_t *class_struct, char *method_name,
+                                      char *method_descriptor);
 
-char          *attribute_name_lookup(attribute_type_t attribute_type);
+char             *attribute_name_lookup(attribute_type_t attribute_type);
 
-char          *get_utf8(class_struct_t *class_struct, uint32_t position);
+char             *get_utf8(class_t *class_struct, uint32_t position);
 
-char          *get_class_name(class_struct_t *class_struct, size_t position);
+char             *get_class_name(class_t *class_struct, size_t position);
 
-char          *get_string(class_struct_t *class_struct, size_t position);
+char             *get_string(class_t *class_struct, size_t position);
 
-char          *get_method_name(class_struct_t *class_struct, size_t position);
+char             *get_method_name(class_t *class_struct, size_t position);
 
-char  *get_method_descriptor(class_struct_t *class_struct, size_t position);
+char             *get_method_descriptor(class_t *class_struct, size_t position);
 
-char  *get_method_class(class_struct_t *class_struct, size_t position);
+char             *get_method_class(class_t *class_struct, size_t position);
 
-size_t count_fields(vm_context_t *context, class_struct_t *class_struct,
-                    flags_t t_acc_flags, flags_t f_acc_flags);
+size_t            count_fields(vm_context_t *context, class_t *class_struct,
+                               flags_t t_acc_flags, flags_t f_acc_flags);
 
 attribute_code_t *find_code(method_info_t *method);
 
-bool is_subclass(vm_context_t *context, class_struct_t *super_class,
-                 char *subclass_name);
+bool              is_subclass(vm_context_t *context, char *super_class_name,
+                              char *subclass_name);
 
 #endif

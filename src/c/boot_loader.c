@@ -181,11 +181,11 @@ read_exception_table_entry(FILE                    *class_file,
 
 /* read_code_attribute uses this yet this is internal function, I don't want
    put it into header */
-bool read_attribute(FILE *class_file, class_struct_t *class_struct,
+bool read_attribute(FILE *class_file, class_t *class_struct,
                     attribute_info_t *dest);
 
 bool
-read_code_attribute(FILE *class_file, class_struct_t *class_struct,
+read_code_attribute(FILE *class_file, class_t *class_struct,
                     attribute_info_t *dest)
 {
     attribute_code_t *code_info = malloc(sizeof(attribute_code_t));
@@ -215,8 +215,7 @@ read_code_attribute(FILE *class_file, class_struct_t *class_struct,
 }
 
 bool
-read_attribute(FILE *class_file, class_struct_t *class_struct,
-               attribute_info_t *dest)
+read_attribute(FILE *class_file, class_t *class_struct, attribute_info_t *dest)
 {
     u2_t  attribute_name_index;
     char *attribute_name;
@@ -234,8 +233,7 @@ read_attribute(FILE *class_file, class_struct_t *class_struct,
 }
 
 bool
-read_field_info(FILE *class_file, class_struct_t *class_struct,
-                field_info_t *dest)
+read_field_info(FILE *class_file, class_t *class_struct, field_info_t *dest)
 {
     dest->access_flags = read_u2(class_file);
     dest->name = get_utf8(class_struct, read_u2(class_file));
@@ -250,7 +248,7 @@ read_field_info(FILE *class_file, class_struct_t *class_struct,
 }
 
 bool
-read_method(FILE *class_file, class_struct_t *class_struct, method_info_t *dest)
+read_method(FILE *class_file, class_t *class_struct, method_info_t *dest)
 {
     dest->access_flags = read_u2(class_file);
     dest->name = get_utf8(class_struct, read_u2(class_file));
@@ -265,9 +263,10 @@ read_method(FILE *class_file, class_struct_t *class_struct, method_info_t *dest)
 }
 
 bool
-read_class(FILE *class_file, class_struct_t *dest)
+read_class(FILE *class_file, class_t *dest)
 {
     uint32_t magic;
+    size_t   class_name_len;
 
     magic = read_u4(class_file);
 
@@ -294,6 +293,13 @@ read_class(FILE *class_file, class_struct_t *dest)
 
     dest->this_class = get_class_name(dest, read_u2(class_file));
     dest->super_class = get_class_name(dest, read_u2(class_file));
+
+    class_name_len = strlen(dest->this_class);
+    dest->descriptor = malloc(sizeof(char) * class_name_len + 2);
+    strcpy(dest->descriptor + 1, dest->this_class);
+    dest->descriptor[0] = 'L';
+    dest->descriptor[class_name_len + 1] = ';';
+
 
     dest->interfaces_count = read_u2(class_file);
     dest->interfaces = malloc(sizeof(u2_t) * dest->interfaces_count);
@@ -323,13 +329,13 @@ read_class(FILE *class_file, class_struct_t *dest)
     return true;
 }
 
-class_struct_t *
+class_t *
 load_class(vm_context_t *context, char *class_name)
 {
-    FILE           *class_file;
-    char           *path;
-    class_struct_t *new_class;
-    bool            success;
+    FILE    *class_file;
+    char    *path;
+    class_t *new_class;
+    bool     success;
 
     if (context->class_table->count == context->class_table->size) {
         size_t new_size;
@@ -342,8 +348,7 @@ load_class(vm_context_t *context, char *class_name)
 
         context->class_table->size = new_size;
         context->class_table->class_pool = realloc(
-            context->class_table->class_pool,
-            sizeof(class_struct_t *) * new_size);
+            context->class_table->class_pool, sizeof(class_t *) * new_size);
     }
     success = false;
     path = malloc(sizeof(char) * PATH_MAX);
@@ -354,7 +359,7 @@ load_class(vm_context_t *context, char *class_name)
 
         if (class_file) {
 
-            new_class = malloc(sizeof(class_struct_t));
+            new_class = malloc(sizeof(class_t));
             context->class_table->class_pool[context->class_table->count] =
                 new_class;
             read_class(class_file, new_class);
@@ -382,10 +387,10 @@ load_class(vm_context_t *context, char *class_name)
     return new_class;
 }
 
-class_struct_t *
+class_t *
 resolve_class(vm_context_t *context, char *class_name)
 {
-    class_struct_t *resolved_class;
+    class_t *resolved_class;
 
     resolved_class = find_class(context, class_name);
 
@@ -395,4 +400,3 @@ resolve_class(vm_context_t *context, char *class_name)
 
     return resolved_class;
 }
-

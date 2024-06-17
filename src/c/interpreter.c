@@ -8,14 +8,17 @@
 #include "interpreter.h"
 #include "jvm.h"
 #include "object.h"
+#include "types.h"
 
-field_struct_t *
-find_field(instance_struct_t *instance_struct, char *name, char *descriptor)
+field_t *
+find_field(instance_t *instance_struct, char *name, descriptor_t descriptor)
 {
-    field_struct_t *field;
+    field_t *field;
 
     field = NULL;
     for (size_t i = 0; i < instance_struct->fields_count; i++) {
+        printf("%s %s -- %s %s\n", name, instance_struct->fields[i].field_name,
+               descriptor, instance_struct->fields[i].descriptor);
         if (strcmp(name, instance_struct->fields[i].field_name) == 0
             && strcmp(descriptor, instance_struct->fields[i].descriptor) == 0) {
             field = instance_struct->fields + i;
@@ -26,35 +29,36 @@ find_field(instance_struct_t *instance_struct, char *name, char *descriptor)
     return field;
 }
 
-object_struct_t *
+object_t *
 allocate_string(vm_context_t *context, char *string)
 {
-    class_struct_t    *string_class;
-    object_struct_t   *string_object, *array_object;
-    instance_struct_t *string_instance;
-    array_struct_t    *array;
-    field_struct_t    *field;
-    size_t             length;
+    class_t    *string_class;
+    object_t   *string_object, *array_object;
+    instance_t *string_instance;
+    iarray_t   *array;
+    field_t    *field;
+    size_t      length;
 
     length = strlen(string);
-    array_object = allocate_array_i(context, 1, &length);
-    array = array_object->value.array;
+    array_object = allocate_array_i(context, length);
+    array = array_object->value.iarray;
+
     for (size_t i = 0; i < length; i++) {
-        array->value[i].jint = string[i];
+        array->value[i] = string[i];
     }
 
     string_class = resolve_class(context, "java/lang/String");
     string_object = allocate_instance(context, string_class, false);
     string_instance = string_object->value.instance;
-
     field = find_field(string_instance, "value", "[I");
-    field->value.object_struct = array_object;
+    printf("%s\n", array_object->descriptor);
+    field->value.object = array_object;
 
     return string_object;
 }
 
 bool
-init_static(vm_context_t *context, class_struct_t *class_struct)
+init_static(vm_context_t *context, class_t *class_struct)
 {
     if (class_struct->static_instance != NULL) {
         return false;
@@ -65,14 +69,14 @@ init_static(vm_context_t *context, class_struct_t *class_struct)
     return true;
 }
 
-vm_frame_t *
+frame_t *
 curr_frame(vm_context_t *context)
 {
     return context->frame_stack->frames[context->frame_stack->count - 1];
 }
 
 bool
-push_stack(vm_frame_t *frame, vm_value_t value)
+push_stack(frame_t *frame, vm_value_t value)
 {
     if (frame->max_stack == frame->stack_count) {
         return false;
@@ -84,7 +88,7 @@ push_stack(vm_frame_t *frame, vm_value_t value)
 }
 
 vm_value_t
-pop_stack(vm_frame_t *frame)
+pop_stack(frame_t *frame)
 {
     vm_value_t value;
     if (frame->stack_count == 0) {
@@ -110,7 +114,7 @@ package_len(char *class_name)
 }
 
 bool
-is_same_package(class_struct_t *class_first, class_struct_t *class_second)
+is_same_package(class_t *class_first, class_t *class_second)
 {
     size_t package_len_first, package_len_second;
     bool   is_same_package;
@@ -128,8 +132,8 @@ is_same_package(class_struct_t *class_first, class_struct_t *class_second)
 }
 
 bool
-is_accessible(vm_context_t *context, class_struct_t *class_destination,
-              class_struct_t *class_origin, flags_t access_flags)
+is_accessible(vm_context_t *context, class_t *class_destination,
+              class_t *class_origin, flags_t access_flags)
 {
 
     bool same_package;
@@ -151,57 +155,58 @@ is_accessible(vm_context_t *context, class_struct_t *class_destination,
         return false;
     }
 
-    return is_subclass(context, class_destination, class_origin->this_class);
+    return is_subclass(context, class_destination->this_class,
+                       class_origin->this_class);
 }
 
-array_value_t *
+jint_t *
 get_string_data(vm_value_t string)
 {
-    instance_struct_t *string_instance;
-    field_struct_t    *field;
+    instance_t *string_instance;
+    field_t    *field;
 
-    string_instance = string.value.object_struct->value.instance;
+    string_instance = string.content.object->value.instance;
 
     field = find_field(string_instance, "value", "[I");
-    return field->value.object_struct->value.array->value;
+    return field->value.object->value.iarray->value;
 }
 
 size_t
 get_string_len(vm_value_t string)
 {
-    instance_struct_t *string_instance;
-    field_struct_t    *field;
+    instance_t *string_instance;
+    field_t    *field;
 
-    string_instance = string.value.object_struct->value.instance;
+    string_instance = string.content.object->value.instance;
 
     field = find_field(string_instance, "value", "[I");
-    return field->value.object_struct->value.array->size;
+    return field->value.object->value.iarray->size;
 }
 
 bool
 execute_invokestatic(vm_context_t *context)
 {
-    size_t          method_position, args_count;
-    vm_frame_t     *frame;
-    method_info_t  *method_info;
-    char           *class_name, *descriptor, *method_name;
-    method_info_t  *method;
-    class_struct_t *class_struct;
-    vm_value_t     *args;
-    vm_frame_t     *new_frame;
-    bool            is_method_accessible;
+    size_t         method_position, args_count;
+    frame_t       *frame;
+    method_info_t *method_info;
+    char          *class_name, *descriptor, *method_name;
+    method_info_t *method;
+    class_t       *class_struct;
+    vm_value_t    *args;
+    frame_t       *new_frame;
+    bool           is_method_accessible;
 
     /* Do *a lot* of typechecking here */
     frame = curr_frame(context);
     method_position = frame->code[frame->pc + 1] << 8
                       | frame->code[frame->pc + 2];
-    class_name = get_method_class(frame->class_struct, method_position);
-    method_name = get_method_name(frame->class_struct, method_position);
-    descriptor = get_method_descriptor(frame->class_struct, method_position);
+    class_name = get_method_class(frame->frame_class, method_position);
+    method_name = get_method_name(frame->frame_class, method_position);
+    descriptor = get_method_descriptor(frame->frame_class, method_position);
     class_struct = resolve_class(context, class_name);
     method = find_method_virtual(class_struct, method_name, descriptor);
     is_method_accessible = is_accessible(
-        context, class_struct, frame->class_struct, method->access_flags);
+        context, class_struct, frame->frame_class, method->access_flags);
 
     args_count = count_method_args(method->descriptor);
     args = frame->stack + frame->stack_count - args_count;
@@ -222,8 +227,8 @@ execute_invokestatic(vm_context_t *context)
 bool
 execute_aload(vm_context_t *context, size_t index, bool is_const)
 {
-    vm_frame_t *frame;
-    bool        result;
+    frame_t *frame;
+    bool     result;
 
     frame = curr_frame(context);
     if (frame->max_locals <= index || frame->max_stack == frame->stack_count) {
@@ -242,21 +247,21 @@ execute_aload(vm_context_t *context, size_t index, bool is_const)
 bool
 execute_ldc(vm_context_t *context)
 {
-    vm_frame_t *frame;
-    cp_info_t  *constant;
-    uint8_t     position;
-    vm_value_t  value;
-    bool        result;
+    frame_t   *frame;
+    cp_info_t *constant;
+    uint8_t    position;
+    vm_value_t value;
+    bool       result;
 
     frame = curr_frame(context);
     position = frame->code[frame->pc + 1];
 
-    constant = frame->class_struct->constant_pool + position - 1;
+    constant = frame->frame_class->constant_pool + position - 1;
     switch (constant->tag) {
         case CONSTANT_STRING:
-            value.value.object_struct = allocate_string(
-                context, get_string(frame->class_struct, position));
-            value.type = J_REFERENCE;
+            value.content.object = allocate_string(
+                context, get_string(frame->frame_class, position));
+            value.descriptor = "Ljava/lang/String;";
             push_stack(frame, value);
             result = true;
             break;
@@ -276,9 +281,9 @@ execute_ldc(vm_context_t *context)
 bool
 execute_frame(vm_context_t *context)
 {
-    vm_frame_t    *frame;
-    array_value_t *string_data;
-    size_t         string_len;
+    frame_t *frame;
+    jint_t  *string_data;
+    size_t   string_len;
 
     frame = curr_frame(context);
 
@@ -287,12 +292,12 @@ execute_frame(vm_context_t *context)
     if (frame->is_native) {
         if (strcmp(frame->descriptor, "(Ljava/lang/String;)V") == 0
             && strcmp(frame->method_name, "nativePrint")
-            && strcmp(frame->class_struct->this_class, "BuilinPrinter")) {
+            && strcmp(frame->frame_class->this_class, "BuilinPrinter")) {
 
             string_data = get_string_data(frame->locals[0]);
             string_len = get_string_len(frame->locals[0]);
             for (size_t i = 0; i < string_len; i++) {
-                printf("%c", string_data[i].jint);
+                printf("%c", string_data[i]);
             }
 
             printf("\n");
